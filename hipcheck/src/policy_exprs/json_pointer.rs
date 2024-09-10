@@ -104,8 +104,12 @@ fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'va
 fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Expr> {
 	match val {
 		Value::Number(n) => {
+			// if n.is_i64() {
+			// 	Ok(Expr::Primitive(Primitive::Int(n.as_i64().unwrap())))
+			// } else {
 			let not_nan = NotNan::new(n.as_f64().unwrap()).unwrap();
 			Ok(Expr::Primitive(Primitive::Float(not_nan)))
+			// }
 		}
 		Value::Bool(b) => Ok(Expr::Primitive(Primitive::Bool(*b))),
 		Value::Array(a) => {
@@ -174,6 +178,14 @@ mod tests {
 		let src = "(eq 1 $/data/one)";
 		let matches = parse_json_pointer(src);
 		assert_eq!(matches, Some(("$/data/one", "/data/one")));
+	}
+
+	#[test]
+	fn basic_int() {
+		let program = "$";
+		let context = serde_json::json!(7);
+		let processed = process_json_pointers(program, &context).unwrap();
+		assert_eq!(processed, "7.0");
 	}
 
 	#[test]
