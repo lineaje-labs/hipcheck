@@ -1,0 +1,15 @@
+
+[dist]
+
+# Make sure that 'dist' will handle releases for this. Otherwise, since
+# the crate is set to 'publish = false', 'dist' would ignore it by default.
+dist = true
+
+# For now we'll only use these installers. In the future we might add others.
+installers = ["shell", "powershell"]
+
+# Yes we want the updater.
+install-updater = true
+
+# Make sure to include the configuration.
+include = ["../config/"]
