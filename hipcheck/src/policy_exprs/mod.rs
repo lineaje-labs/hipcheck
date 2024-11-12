@@ -47,6 +47,8 @@ impl Executor {
 	pub fn parse_and_eval(&self, raw_program: &str, context: &Value) -> Result<Expr> {
 		let program = parse(raw_program)?;
 		// JSON Pointer lookup failures happen on this line.
+		log::info!("CTX: {:?}", context);
+		log::info!("raw program: {}", raw_program);
 		let processed_program = LookupJsonPointers::with_context(context).run(program)?;
 		let expr = self.env.visit_expr(processed_program)?;
 		Ok(expr)
