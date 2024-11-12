@@ -207,7 +207,11 @@ where
 
 	let arr = match env.visit_expr(args[0].clone())? {
 		Array(a) => array_type(&a.elts[..])?,
-		_ => return Err(Error::BadType(name)),
+		_ => {
+			log::info!("name: {:?}", name);
+			log::info!("args: {:?}", args);
+			return Err(Error::BadType(name));
+		}
 	};
 
 	op(arr)
@@ -694,6 +698,8 @@ fn median(env: &Env, args: &[Expr]) -> Result<Expr> {
 
 fn count(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "count";
+
+	log::info!("COUNT");
 
 	let op = |arg| match arg {
 		ArrayType::Int(ints) => Ok(Primitive(Int(ints.len() as i64))),
