@@ -3,16 +3,13 @@
 pub mod affiliation;
 pub mod binary;
 pub mod binary_detector;
-pub mod churn;
 pub mod commit_trust;
 pub mod contributor_trust;
-pub mod entropy;
 pub mod fuzz;
 pub mod identity;
 pub mod linguist;
 mod math;
 pub mod review;
-pub mod typo;
 
 use crate::{
 	config::{AttacksConfigQuery, CommitConfigQuery},
@@ -20,9 +17,9 @@ use crate::{
 	error::Result,
 	metric::{
 		affiliation::AffiliationOutput, binary::BinaryOutput,
-		binary_detector::BinaryFile, churn::ChurnOutput, commit_trust::CommitTrustOutput,
-		contributor_trust::ContributorTrustOutput, entropy::EntropyOutput, fuzz::FuzzOutput,
-		identity::IdentityOutput, linguist::Linguist, review::ReviewOutput, typo::TypoOutput,
+		binary_detector::BinaryFile, commit_trust::CommitTrustOutput,
+		contributor_trust::ContributorTrustOutput, fuzz::FuzzOutput,
+		identity::IdentityOutput, linguist::Linguist, review::ReviewOutput,
 	},
 };
 use std::sync::Arc;
@@ -48,10 +45,6 @@ pub trait MetricProvider:
 	#[salsa::invoke(binary::binary_metric)]
 	fn binary_metric(&self) -> Result<Arc<BinaryOutput>>;
 
-	/// Returns result of churn metric
-	#[salsa::invoke(churn::churn_metric)]
-	fn churn_metric(&self) -> Result<Arc<ChurnOutput>>;
-
 	/// Returns result of contributor trust metric
 	#[salsa::invoke(commit_trust::commit_trust_metric)]
 	fn commit_trust_metric(&self) -> Result<Arc<CommitTrustOutput>>;
@@ -59,10 +52,6 @@ pub trait MetricProvider:
 	/// Returns result of contributor trust metric
 	#[salsa::invoke(contributor_trust::contributor_trust_metric)]
 	fn contributor_trust_metric(&self) -> Result<Arc<ContributorTrustOutput>>;
-
-	/// Returns result of entropy metric
-	#[salsa::invoke(entropy::entropy_metric)]
-	fn entropy_metric(&self) -> Result<Arc<EntropyOutput>>;
 
 	/// Returns result of identity metric
 	#[salsa::invoke(identity::identity_metric)]
@@ -76,7 +65,4 @@ pub trait MetricProvider:
 	#[salsa::invoke(review::review_metric)]
 	fn review_metric(&self) -> Result<Arc<ReviewOutput>>;
 
-	/// Returns result of typo metric
-	#[salsa::invoke(typo::typo_metric)]
-	fn typo_metric(&self) -> Result<Arc<TypoOutput>>;
 }
