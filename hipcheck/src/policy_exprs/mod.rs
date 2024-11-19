@@ -83,6 +83,166 @@ impl ExprMutator for Env<'_> {
 	}
 }
 
+pub fn parse_failing_expr_to_english(
+	input: &str,
+	explanation: &str,
+	value: &Option<Value>,
+) -> Result<String> {
+	let expression = parse(input)?;
+	let english_expr = match expression {
+		Expr::Function(function) => {
+			let ident = function.ident;
+			let operator = operator_to_english(&ident.to_string())?;
+			let args = function.args;
+			let inner = args.first().ok_or(Error::MissingArgs)?;
+			let expected_value = primitive_to_english(args.last().ok_or(Error::MissingArgs)?)?;
+
+			// Special case of a simple boolean comparison
+			if inner.to_string() == "$" {
+				let inner_value = match value {
+					Some(context) => context.to_string(),
+					None => "No value returned by query".to_string(),
+				};
+				format!(
+					"expected {} to be {} {}, was {}",
+					explanation, operator, expected_value, inner_value
+				)
+			} else {
+				let inner_value = match value {
+					Some(context) => Executor::std()
+						.parse_and_eval(&inner.to_string(), context)?
+						.to_string(),
+					None => "No value returned by query".to_string(),
+				};
+
+				// Special case of a percentage calculation
+				if let Some((percent_operator, percent_threshold)) = percent_function(inner) {
+					format!(
+						"expected the percentage of {} {} {} to be {} {}, was {}",
+						explanation,
+						percent_operator,
+						percent_threshold,
+						operator,
+						expected_value,
+						inner_value
+					)
+				// Special case of counting elements of a list
+				} else if let Some((count_operator, count_threshold)) = count_function(inner) {
+					// Special subcase of just counting the "trues"
+					if count_operator == "equal to" && count_threshold == "true" {
+						format!(
+							"expected the number of {} to be {} {}, was {}",
+							explanation, operator, expected_value, inner_value
+						)
+					} else {
+						format!(
+							"expected the number of {} {} {} to be {} {}, was {}",
+							explanation,
+							count_operator,
+							count_threshold,
+							operator,
+							expected_value,
+							inner_value
+						)
+					}
+				// Fallback statement to print the provided policy expression
+				} else {
+					format!(
+						"expected the {} passed through {} to be {} {}, was {}",
+						explanation, inner, operator, expected_value, inner_value
+					)
+				}
+			}
+		}
+		_ => return Err(Error::MissingIdent),
+	};
+
+	Ok(english_expr)
+}
+
+fn operator_to_english(operator: &str) -> Result<String> {
+	// Only idents that return a Boolean should be in this spot
+	let operator_message = match operator {
+		"gt" => "greater than".to_string(),
+		"lt" => "less than".to_string(),
+		"gte" => "greater than or equal to".to_string(),
+		"lte" => "less than or equal to".to_string(),
+		"eq" => "equal to".to_string(),
+		"ne" => "not equal to".to_string(),
+		_ => return Err(Error::WrongTypeInIdentSpot),
+	};
+
+	Ok(operator_message)
+}
+
+fn primitive_to_english(expr: &Expr) -> Result<String> {
+	match expr {
+		Expr::Primitive(primitive) => match primitive {
+			Primitive::Bool(true) => Ok("true".to_string()),
+			Primitive::Bool(false) => Ok("false".to_string()),
+			Primitive::Int(i) => Ok(i.to_string()),
+			Primitive::Float(f) => Ok(f.to_string()),
+			Primitive::DateTime(dt) => Ok(dt.to_string()),
+			Primitive::Span(span) => Ok(span.to_string()),
+			Primitive::Identifier(ident) => Err(Error::BadType("primitive_to_english()")),
+		},
+		_ => Err(Error::BadType("primitive_to_english()")),
+	}
+}
+
+/// Check if the inner argument of a policy expresion corresponds to a percentage calculation
+/// If it does, return the comparision operator and threshold value used in that calculation
+/// Returns `None` if anything fails, which will cause the English parsing function to use the default policy expression format
+fn percent_function(expr: &Expr) -> Option<(String, String)> {
+	if let Expr::Function(inner_function_1) = expr {
+		if inner_function_1.ident.to_string() == "divz"
+			&& &inner_function_1.args.last()?.to_string() == "(count $)"
+		{
+			let division_inner = inner_function_1.args.first()?;
+			if let Expr::Function(inner_function_2) = division_inner {
+				if inner_function_2.ident.to_string() == "count" {
+					let count_inner = inner_function_2.args.first()?;
+					if let Expr::Function(inner_function_3) = count_inner {
+						if inner_function_3.ident.to_string() == "filter" {
+							let filter_inner = inner_function_3.args.first()?;
+							if let Expr::Function(percent_function) = filter_inner {
+								let percent_operator =
+									operator_to_english(&percent_function.ident.to_string())
+										.ok()?;
+								let percent_threshold =
+									primitive_to_english(percent_function.args.first()?).ok()?;
+								return Some((percent_operator, percent_threshold));
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	None
+}
+
+fn count_function(expr: &Expr) -> Option<(String, String)> {
+	if let Expr::Function(inner_function_1) = expr {
+		if inner_function_1.ident.to_string() == "count" {
+			let count_inner = inner_function_1.args.first()?;
+			if let Expr::Function(inner_function_2) = count_inner {
+				if inner_function_2.ident.to_string() == "filter" {
+					let filter_inner = inner_function_2.args.first()?;
+					if let Expr::Function(count_function) = filter_inner {
+						let count_operator =
+							operator_to_english(&count_function.ident.to_string()).ok()?;
+						let count_threshold =
+							primitive_to_english(count_function.args.first()?).ok()?;
+						return Some((count_operator, count_threshold));
+					}
+				}
+			}
+		}
+	}
+	None
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -266,5 +426,16 @@ mod tests {
 			.parse_and_eval(format!("(add {} {})", span, date).as_str(), &context)
 			.unwrap();
 		assert_eq!(expected, result2);
+	}
+
+	#[test]
+	fn parse_percent() {
+		let raw_expr = "(divz (count (filter (eq #f) $)) (count $))";
+		let expr = parse(raw_expr).unwrap();
+		let (result_operator, result_threshold) = percent_function(&expr).unwrap();
+		let expected_operator = operator_to_english("eq").unwrap();
+		let expected_threshold = primitive_to_english(&parse("#f").unwrap()).unwrap();
+		assert_eq!(expected_operator, result_operator);
+		assert_eq!(expected_threshold, result_threshold);
 	}
 }

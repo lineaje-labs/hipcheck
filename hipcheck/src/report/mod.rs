@@ -14,12 +14,13 @@ pub mod report_builder;
 use crate::{
 	cli::Format,
 	error::{Context, Error, Result},
-	policy_exprs::Executor,
+	policy_exprs::{self, Executor},
 	version::VersionQuery,
 };
 use chrono::prelude::*;
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
+use serde_json::Value;
 use std::{
 	default::Default,
 	fmt,
@@ -283,16 +284,29 @@ pub struct Analysis {
 	/// *why* an analysis failed.
 	policy_expr: String,
 
+	/// The value returned by the analysis, if any, that was used in computing the policy expression
+	///
+	/// We use this when printing the result to help explain to the user
+	/// *why* an analysis failed.
+	value: Option<Value>,
+
 	/// The default query explanation pulled from RPC with the plugin.
 	message: String,
 }
 
 impl Analysis {
-	pub fn plugin(name: String, passed: bool, policy_expr: String, message: String) -> Self {
+	pub fn plugin(
+		name: String,
+		passed: bool,
+		policy_expr: String,
+		value: Option<Value>,
+		message: String,
+	) -> Self {
 		Analysis {
 			name,
 			passed,
 			policy_expr,
+			value,
 			message,
 		}
 	}
@@ -311,6 +325,17 @@ impl Analysis {
 
 	pub fn explanation(&self) -> String {
 		self.message.clone()
+	}
+
+	pub fn failing_explanation(&self) -> Result<String> {
+		let input = &self.policy_expr;
+		let explanation = &self.message;
+		let value = &self.value;
+		Ok(policy_exprs::parse_failing_expr_to_english(
+			input,
+			explanation,
+			value,
+		)?)
 	}
 }
 

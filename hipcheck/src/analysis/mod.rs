@@ -22,7 +22,6 @@ use std::{
 pub trait AnalysisProvider:
 	AttacksConfigQuery + CommitConfigQuery + GitProvider + MetricProvider + PracticesConfigQuery
 {
-	 
 	/// Returns result of affiliation analysis
 	fn affiliation_analysis(&self) -> Result<QueryResult>;
 
@@ -47,7 +46,6 @@ pub trait AnalysisProvider:
 	/// Returns result of typo analysis
 	fn typo_analysis(&self) -> Result<QueryResult>;
 }
-
 
 pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 	let results = db.affiliation_metric()?;

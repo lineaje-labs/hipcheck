@@ -19,8 +19,8 @@ use crate::{
 	data::{git::GitProvider, DependenciesProvider, FuzzProvider, PullRequestReviewProvider},
 	error::Result,
 	metric::{
-		affiliation::AffiliationOutput, binary::BinaryOutput,
-		binary_detector::BinaryFile, churn::ChurnOutput, commit_trust::CommitTrustOutput,
+		affiliation::AffiliationOutput, binary::BinaryOutput, binary_detector::BinaryFile,
+		churn::ChurnOutput, commit_trust::CommitTrustOutput,
 		contributor_trust::ContributorTrustOutput, entropy::EntropyOutput, fuzz::FuzzOutput,
 		identity::IdentityOutput, linguist::Linguist, review::ReviewOutput, typo::TypoOutput,
 	},
@@ -39,7 +39,6 @@ pub trait MetricProvider:
 	+ FuzzProvider
 	+ PullRequestReviewProvider
 {
-	
 	/// Returns result of affiliation metric
 	#[salsa::invoke(affiliation::affiliation_metric)]
 	fn affiliation_metric(&self) -> Result<Arc<AffiliationOutput>>;
