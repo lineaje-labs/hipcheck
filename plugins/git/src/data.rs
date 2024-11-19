@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use hipcheck_sdk::types::LocalGitRepo;
+use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -21,15 +22,38 @@ pub struct DetailedGitRepo {
 }
 
 /// Commits as they come directly out of `git log`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct RawCommit {
 	pub hash: String,
 
 	pub author: Contributor,
-	pub written_on: Result<String, String>,
+	pub written_on: Result<Timestamp, String>,
 
 	pub committer: Contributor,
-	pub committed_on: Result<String, String>,
+	pub committed_on: Result<Timestamp, String>,
+}
+
+impl From<git2::Commit<'_>> for RawCommit {
+	fn from(value: git2::Commit<'_>) -> Self {
+		let hash = value.id().to_string();
+		let author = &value.author();
+		let committer = &value.committer();
+
+		let written_time_sec_since_epoch =
+			author.when().seconds() + (author.when().offset_minutes() as i64 * 60);
+		let commit_time_sec_since_epoch =
+			committer.when().seconds() + (committer.when().offset_minutes() as i64 * 60);
+
+		RawCommit {
+			hash,
+			author: author.into(),
+			written_on: jiff::Timestamp::from_second(written_time_sec_since_epoch)
+				.map_err(|e| format!("Error converting commit author time to Timestamp: {}", e)),
+			committer: committer.into(),
+			committed_on: jiff::Timestamp::from_second(commit_time_sec_since_epoch)
+				.map_err(|e| format!("Error converting commit author time to Timestamp: {}", e)),
+		}
+	}
 }
 
 /// Commits as understood in Hipcheck's data model.
@@ -45,6 +69,23 @@ pub struct Commit {
 	pub committed_on: Result<String, String>,
 }
 
+impl From<&RawCommit> for Commit {
+	fn from(value: &RawCommit) -> Self {
+		let value = value.clone();
+		Self::from(value)
+	}
+}
+
+impl From<RawCommit> for Commit {
+	fn from(value: RawCommit) -> Self {
+		Self {
+			hash: value.hash,
+			written_on: value.written_on.map(|x| x.to_string()),
+			committed_on: value.committed_on.map(|x| x.to_string()),
+		}
+	}
+}
+
 impl Display for Commit {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		write!(f, "{}", self.hash)
@@ -58,6 +99,15 @@ impl Display for Commit {
 pub struct Contributor {
 	pub name: String,
 	pub email: String,
+}
+
+impl From<&git2::Signature<'_>> for Contributor {
+	fn from(value: &git2::Signature) -> Self {
+		Self {
+			name: value.name().unwrap().to_string(),
+			email: value.email().unwrap().to_string(),
+		}
+	}
 }
 
 impl Display for Contributor {
@@ -133,4 +183,14 @@ pub struct FileDiff {
 	pub additions: Option<i64>,
 	pub deletions: Option<i64>,
 	pub patch: String,
+}
+
+impl FileDiff {
+	pub fn increment_additions(&mut self, amount: i64) {
+		self.additions = Some(self.additions.unwrap_or_default() + amount)
+	}
+
+	pub fn increment_deletions(&mut self, amount: i64) {
+		self.additions = Some(self.deletions.unwrap_or_default() + amount)
+	}
 }
