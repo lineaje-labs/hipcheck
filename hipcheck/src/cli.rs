@@ -417,6 +417,14 @@ pub struct CheckArgs {
 	#[clap(long = "ref")]
 	pub refspec: Option<String>,
 
+	/// The URL value of the target that should be used instead of automatically determining it and set in the report as well
+	#[clap(long = "url-value")]
+	pub url_value: Option<String>,
+
+	/// The path of the local folder where Repo is checked out for NPM, Maven and PyPI packages
+	#[clap(long = "pkg-repo-local-path")]
+	pub pkg_repo_local_path: Option<String>,
+
 	#[clap(subcommand)]
 	command: Option<CheckCommand>,
 
@@ -503,6 +511,8 @@ impl ToTargetSeed for CheckArgs {
 		let target = TargetSeed {
 			kind,
 			refspec: self.refspec.clone(),
+			url_value: self.url_value.clone(),
+			pkg_repo_local_path: self.pkg_repo_local_path.clone(),
 		};
 		// Validate
 		if let Some(refspec) = &target.refspec {
@@ -643,6 +653,7 @@ impl ToTargetSeedKind for CheckRepoArgs {
 				Ok(TargetSeedKind::LocalRepo(LocalGitRepo {
 					path,
 					git_ref: "".to_owned(),
+					git_url: "".to_owned(),
 				}))
 			} else {
 				Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))

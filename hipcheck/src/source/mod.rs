@@ -34,38 +34,27 @@ use url::{Host, Url};
 /// cache invalidation.
 
 /// Resolves a specified local git repo into a Target for analysis by Hipcheck
+/// It uses the repo folder directly without copying, cloning or updating it
 pub fn resolve_local_repo(
 	phase: &SpinnerPhase,
 	root: &Path,
 	local_repo: LocalGitRepo,
 ) -> Result<Target> {
-	let src = local_repo.path.clone();
+	// For remote repos originally specified by their URL, the specifier is just that URL
+	let specifier = local_repo.git_url.to_string();
+	let path = pathbuf![&local_repo.path];
 
-	let specifier = src
-		.to_str()
-		.ok_or(hc_error!(
-			"Path to local repo contained one or more invalid characters"
-		))?
-		.to_string();
+	let git_ref = local_repo.git_ref.to_string();
+	let git_url = local_repo.git_url.to_string();
 
-	phase.update_status("copying");
-	let path = clone_local_repo_to_cache(src.as_path(), root)?;
-	let git_ref = git::checkout(&path, Some(local_repo.git_ref.clone()))?;
-	phase.update_status("trying to get remote");
-	let remote = match try_resolve_remote_for_local(&path) {
-		Ok(remote) => Some(remote),
-		Err(err) => {
-			log::debug!("failed to get remote [err='{}']", err);
-			None
-		}
-	};
+	let remote_repo = get_remote_repo_from_url(Url::parse(&git_url).context("invalid repository URL")?)?;
 
-	let local = LocalGitRepo { path, git_ref };
+	let local = LocalGitRepo { path, git_ref, git_url };
 
 	Ok(Target {
 		specifier,
 		local,
-		remote,
+		remote: Some(remote_repo),
 		package: None,
 	})
 }
@@ -111,8 +100,33 @@ pub fn resolve_remote_repo(
 	};
 
 	let git_ref = clone_or_update_remote(phase, &remote_repo.url, &path, refspec)?;
+	let git_url = remote_repo.url.to_string();
 
-	let local = LocalGitRepo { path, git_ref };
+	let local = LocalGitRepo { path, git_ref, git_url };
+
+	Ok(Target {
+		specifier,
+		local,
+		remote: Some(remote_repo),
+		package: None,
+	})
+}
+
+/// Resolves a remote git repo from a local path into a Target for analysis by Hipcheck
+/// It is different from resolve_remote_repo, as it uses a local folder to resolve
+/// It uses the repo folder directly without copying, cloning or updating it
+pub fn resolve_remote_repo_from_path(
+	remote_repo: RemoteGitRepo,
+	repo_local_path: String,
+	refspec: Option<String>,
+) -> Result<Target> {
+	// For remote repos originally specified by their URL, the specifier is just that URL
+	let specifier = remote_repo.url.to_string();
+	let path = pathbuf![&repo_local_path];
+	let git_ref = refspec.clone().unwrap_or("".to_owned());
+	let git_url = remote_repo.url.to_string();
+
+	let local = LocalGitRepo { path, git_ref, git_url };
 
 	Ok(Target {
 		specifier,
@@ -132,6 +146,19 @@ pub fn resolve_remote_package_repo(
 ) -> Result<Target> {
 	let mut target = resolve_remote_repo(phase, root, remote_repo, refspec)?;
 	target.specifier = specifier;
+	Ok(target)
+}
+
+/// Resolves a remote package from a local repo path into a Target for analysis by Hipcheck
+/// It is different from resolve_remote_package_repo, as it uses a local folder to resolve the
+/// repository for the remote package. NPM, Maven and PyPI is resolved here.
+/// It uses the repo folder directly without copying, cloning or updating it
+pub fn resolve_remote_package_repo_from_path(
+	remote_repo: RemoteGitRepo,
+	repo_local_path: String,
+	refspec: Option<String>,
+) -> Result<Target> {
+	let target = resolve_remote_repo_from_path(remote_repo, repo_local_path, refspec)?;
 	Ok(target)
 }
 
