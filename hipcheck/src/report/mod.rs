@@ -42,6 +42,9 @@ pub struct Report {
 	/// The HEAD commit hash of the repository during analysis.
 	pub repo_head: Arc<String>,
 
+	/// The URL of the repository being analyzed.
+	pub repo_url: Arc<String>,
+
 	/// The version of Hipcheck used to analyze the repo.
 	pub hipcheck_version: String,
 
@@ -64,7 +67,7 @@ pub struct Report {
 impl Report {
 	/// Get the repository that was analyzed.
 	pub fn analyzed(&self) -> String {
-		format!("{} ({})", self.repo_name, self.repo_head)
+		format!("{} ({}) ({})", self.repo_name, self.repo_head, self.repo_url)
 	}
 
 	/// Get the version of Hipcheck used for the analysis.

@@ -179,6 +179,8 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 				known_remote: None,
 			}),
 			refspec: Some("HEAD".to_owned()),
+			url_value: Some("https://github.com/mitre/hipcheck.git".to_owned()),
+			pkg_repo_local_path: Some("".to_owned()),
 		},
 		config.config().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),

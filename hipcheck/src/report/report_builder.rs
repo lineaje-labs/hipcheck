@@ -364,6 +364,7 @@ impl<'sess> ReportBuilder<'sess> {
 	pub fn build(self) -> Result<Report> {
 		let repo_name = self.session.name();
 		let repo_head = self.session.head();
+		let repo_url = self.session.repo_url();
 		let hipcheck_version = self.session.hc_version().to_string();
 		let analyzed_at = Timestamp::from(self.session.started_at());
 		let passing = self.passing;
@@ -413,6 +414,7 @@ impl<'sess> ReportBuilder<'sess> {
 		let report = Report {
 			repo_name,
 			repo_head,
+			repo_url,
 			hipcheck_version,
 			analyzed_at,
 			passing,

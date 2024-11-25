@@ -350,15 +350,14 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 			// there's overlap with LocalGitRepo.git_ref. Copy CLI refspec here.
 			let mut source = source.to_owned();
 			source.git_ref = seed.refspec.clone().unwrap_or("HEAD".to_owned());
+			source.git_url = seed.url_value.clone().unwrap_or("".to_owned());
 			source::resolve_local_repo(phase, home, source)
 		}
 		Package(package) => {
-			// Attempt to get the git repo URL for the package
-			let package_git_repo_url =
-				detect_and_extract(package).context("Could not get git repo URL for package")?;
-
-			// Create Target for a remote git repo originating with a package
-			let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
+			// Read the Git Repo URL specified for this package
+			// If the Repo URL is provided, then use that for this package; instead of resolving it
+			// from the package directly
+			let git_url = seed.url_value.clone().unwrap().to_string();
 			// TargetSeed validation step should have already ensured both refspec and package
 			// version are not provided, so we can do this
 			let refspec = if let Some(refspec) = &seed.refspec {
@@ -368,13 +367,30 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 			} else {
 				None
 			};
-			source::resolve_remote_package_repo(
-				phase,
-				home,
-				package_git_repo,
-				format!("{}@{}", package.name, package.version),
-				refspec,
-			)
+			if git_url.is_empty() {
+				// Attempt to get the git repo URL for the package
+				let package_git_repo_url =
+					detect_and_extract(package).context("Could not get git repo URL for package")?;
+
+				// Create Target for a remote git repo originating with a package
+				let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
+
+				source::resolve_remote_package_repo(
+					phase,
+					home,
+					package_git_repo,
+					format!("{}@{}", package.name, package.version),
+					refspec,
+				)
+			} else {
+				// This will be used by Hipcheck to query remote Git
+				let package_git_repo = source::get_remote_repo_from_url(Url::parse(&git_url).context("invalid repository URL")?)?;
+				source::resolve_remote_package_repo_from_path(
+					package_git_repo,
+					seed.pkg_repo_local_path.clone().unwrap_or("".to_owned()),
+					refspec,
+				)
+			}
 		}
 		MavenPackage(package) => {
 			// Attempt to get the git repo URL for the Maven package

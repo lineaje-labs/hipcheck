@@ -43,6 +43,9 @@ pub struct LocalGitRepo {
 
 	/// The Git ref we're referring to.
 	pub git_ref: String,
+
+	/// The Git URL we're referring to.
+	pub git_url: String,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Package {
@@ -126,6 +129,10 @@ pub enum TargetSeedKind {
 pub struct TargetSeed {
 	pub kind: TargetSeedKind,
 	pub refspec: Option<String>,
+	// Repo URL for this Package
+	pub url_value: Option<String>,
+	// Path of Local folder where repo of this Package is available
+	pub pkg_repo_local_path: Option<String>,
 }
 
 impl Display for TargetSeedKind {

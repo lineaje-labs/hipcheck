@@ -20,8 +20,10 @@ pub trait SourceQuery: salsa::Database {
 	fn head(&self) -> Arc<String>;
 	/// Returns the repository name
 	fn name(&self) -> Arc<String>;
-	/// Returns the repository url
+	/// Returns the repository url passed as an option
 	fn url(&self) -> Option<Arc<String>>;
+	/// Returns the repository url used for actual analysis
+	fn repo_url(&self) -> Arc<String>;
 }
 
 /// Derived query implementations
@@ -66,4 +68,9 @@ fn name(db: &dyn SourceQuery) -> Arc<String> {
 
 fn url(db: &dyn SourceQuery) -> Option<Arc<String>> {
 	Some(Arc::new(db.remote()?.url.to_string()))
+}
+
+fn repo_url(db: &dyn SourceQuery) -> Arc<String> {
+	let target = db.target();
+	Arc::new(target.local.git_url.clone())
 }
